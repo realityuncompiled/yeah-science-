@@ -38,8 +38,8 @@ ColumnLayout {
             Layout.preferredWidth: 96
             enabled: station.armed
             onPressed: station.setDrive(1, 1)
-            onReleased: station.stop()
-            onCanceled: station.stop()
+            onReleased: station.releaseMouse()
+            onCanceled: station.releaseMouse()
         }
         Item { Layout.preferredWidth: 72 }
 
@@ -48,8 +48,8 @@ ColumnLayout {
             Layout.preferredWidth: 84
             enabled: station.armed
             onPressed: station.setDrive(-1, 1)
-            onReleased: station.stop()
-            onCanceled: station.stop()
+            onReleased: station.releaseMouse()
+            onCanceled: station.releaseMouse()
         }
         Button {
             text: "✖ STOP"
@@ -63,8 +63,8 @@ ColumnLayout {
             Layout.preferredWidth: 84
             enabled: station.armed
             onPressed: station.setDrive(1, -1)
-            onReleased: station.stop()
-            onCanceled: station.stop()
+            onReleased: station.releaseMouse()
+            onCanceled: station.releaseMouse()
         }
 
         Item { Layout.preferredWidth: 72 }
@@ -73,8 +73,8 @@ ColumnLayout {
             Layout.preferredWidth: 96
             enabled: station.armed
             onPressed: station.setDrive(-1, -1)
-            onReleased: station.stop()
-            onCanceled: station.stop()
+            onReleased: station.releaseMouse()
+            onCanceled: station.releaseMouse()
         }
         Item { Layout.preferredWidth: 72 }
     }

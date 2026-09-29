@@ -18,6 +18,31 @@ ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 18; spacing: 12
+                focus: true
+        Component.onCompleted: forceActiveFocus()
+
+        Keys.onPressed: function(event) {
+            if (settings.opened || !station.armed)
+                return
+
+            if ([Qt.Key_W, Qt.Key_Up, Qt.Key_S, Qt.Key_Down,
+                 Qt.Key_A, Qt.Key_Left, Qt.Key_D, Qt.Key_Right].includes(event.key)) {
+                if (!event.isAutoRepeat)
+                    station.setKeyboardKey(event.key, true)
+
+                event.accepted = true
+            }
+        }
+
+        Keys.onReleased: function(event) {
+            if ([Qt.Key_W, Qt.Key_Up, Qt.Key_S, Qt.Key_Down,
+                 Qt.Key_A, Qt.Key_Left, Qt.Key_D, Qt.Key_Right].includes(event.key)) {
+                if (!event.isAutoRepeat)
+                    station.setKeyboardKey(event.key, false)
+
+                event.accepted = true
+            }
+        }
         RowLayout {
             spacing: 12
             RowLayout {

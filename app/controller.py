@@ -7,7 +7,7 @@ import logging
 import math
 import time
 
-from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot, Qt
 
 from app.telemetry import TelemetryStore
 from link.packets import decode, encode
@@ -28,6 +28,8 @@ class Station(QObject):
         self._online = False
         self._armed = False
         self._left = self._right = 0.0
+        self._held_keys = set()
+        self._mouse_drive = None
         self._speed = config["drive_speed"]
         self._seq = 0
         self._events = []
@@ -98,12 +100,70 @@ class Station(QObject):
 
     @Slot(float, float)
     def setDrive(self, left, right):
-        if not self._armed or not self._online:
+        """Receive a mouse-drive command."""
+        if not self._armed or not self._online or self._held_keys:
             return
         if not (math.isfinite(left) and math.isfinite(right)):
             return
-        self._left = max(-1.0, min(1.0, left)) * self._speed
-        self._right = max(-1.0, min(1.0, right)) * self._speed
+
+        self._mouse_drive = (
+            max(-1.0, min(1.0, left)),
+            max(-1.0, min(1.0, right)),
+        )
+        self._apply_drive(*self._mouse_drive)
+
+    @Slot(int, bool)
+    def setKeyboardKey(self, key, pressed):
+        """Track physical movement keys and combine their directions."""
+        key_directions = {
+            int(Qt.Key.Key_W): "forward",
+            int(Qt.Key.Key_Up): "forward",
+            int(Qt.Key.Key_S): "reverse",
+            int(Qt.Key.Key_Down): "reverse",
+            int(Qt.Key.Key_A): "left",
+            int(Qt.Key.Key_Left): "left",
+            int(Qt.Key.Key_D): "right",
+            int(Qt.Key.Key_Right): "right",
+        }
+
+        direction = key_directions.get(key)
+        if direction is None:
+            return
+
+        if pressed:
+            if not self._armed or not self._online:
+                return
+            # Keyboard takes priority; discard any previous mouse command.
+            self._mouse_drive = None
+            self._held_keys.add(key)
+        else:
+            self._held_keys.discard(key)
+
+        if self._held_keys:
+            forward = int(any(
+                key_directions.get(k) == "forward" for k in self._held_keys
+            )) - int(any(
+                key_directions.get(k) == "reverse" for k in self._held_keys
+            ))
+            turn = int(any(
+                key_directions.get(k) == "right" for k in self._held_keys
+            )) - int(any(
+                key_directions.get(k) == "left" for k in self._held_keys
+            ))
+
+            left = max(-1.0, min(1.0, forward + turn))
+            right = max(-1.0, min(1.0, forward - turn))
+            self._apply_drive(left, right)
+        else:
+            # Releasing the last key stops; old mouse input is not resumed.
+            self._mouse_drive = None
+            self._left = self._right = 0.0
+            self._send_drive()
+            self.changed.emit()
+
+    def _apply_drive(self, left, right):
+        self._left = left * self._speed
+        self._right = right * self._speed
         self._send_drive()
         self.changed.emit()
 
@@ -121,7 +181,20 @@ class Station(QObject):
             self._online = False
 
     @Slot()
+    def releaseMouse(self):
+        """Release mouse input without interrupting active keyboard input."""
+        if self._held_keys:
+            return
+
+        self._mouse_drive = None
+        self._left = self._right = 0.0
+        self._send_drive()
+        self.changed.emit()
+
+    @Slot()
     def stop(self):
+        self._held_keys.clear()
+        self._mouse_drive = None
         self._left = self._right = 0.0
         self._send_drive()
         self.changed.emit()
