@@ -88,7 +88,28 @@ ApplicationWindow {
                 }
                 ColumnLayout {
                     spacing: 1
-                    Label { text: station.connected ? "CONNECTED" : "DISCONNECTED"; color: station.connected ? "#00e676" : "#7a8b9e"; font.pixelSize: 11; font.bold: true; font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace" }
+                    Label {
+                        text: {
+                            switch (station.telemetryStatus) {
+                            case "disconnected": return "DISCONNECTED"
+                            case "waiting": return "WAITING FOR TELEMETRY"
+                            case "live": return "TELEMETRY LIVE"
+                            case "stale": return "TELEMETRY STALE"
+                            default: return "UNKNOWN"
+                            }
+                        }
+                    color: {
+                            switch (station.telemetryStatus) {
+                            case "live": return "#00e676"
+                            case "stale": return "#ffb74d"
+                            case "waiting": return "#64b5f6"
+                            default: return "#7a8b9e"
+                            }
+                        }
+                        font.pixelSize: 11
+                        font.bold: true
+                        font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace"
+                    }
                     Label { text: station.endpoint; color: "#485b70"; font.family: Qt.platform.os === "windows" ? "Consolas" : "monospace"; font.pixelSize: 10 }
                 }
             }
@@ -103,10 +124,34 @@ ApplicationWindow {
 
         RowLayout {
             spacing: 12
-            Metric { Layout.fillWidth: true; metricIndex: 1; label: "BATTERY VOLTAGE"; value: station.telemetryData.battery.toFixed(2); unit: "V" }
-            Metric { Layout.fillWidth: true; metricIndex: 2; label: "ROVER HEADING"; value: (station.telemetryData.heading * 180 / Math.PI).toFixed(0); unit: "deg" }
-            Metric { Layout.fillWidth: true; metricIndex: 3; label: "LEFT WHEEL SPD"; value: station.telemetryData.left.toFixed(2); unit: "m/s" }
-            Metric { Layout.fillWidth: true; metricIndex: 4; label: "RIGHT WHEEL SPD"; value: station.telemetryData.right.toFixed(2); unit: "m/s" }
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 1
+                label: "BATTERY VOLTAGE"
+                value: station.telemetryStatus === "live" ? station.telemetryData.battery.toFixed(2) : "—"
+                unit: station.telemetryStatus === "live" ? "V" : ""
+                }
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 2
+                label: "ROVER HEADING"
+                value: station.telemetryStatus === "live" ? (station.telemetryData.heading * 180 / Math.PI).toFixed(0) : "—"
+                unit: station.telemetryStatus === "live" ? "deg" : ""
+                }
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 3
+                label: "LEFT WHEEL SPD"
+                value: station.telemetryStatus === "live" ? station.telemetryData.left.toFixed(2) : "—"
+                unit: station.telemetryStatus === "live" ? "m/s" : ""
+                }
+            Metric {
+                Layout.fillWidth: true
+                metricIndex: 4
+                label: "RIGHT WHEEL SPD"
+                value: station.telemetryStatus === "live" ? station.telemetryData.right.toFixed(2) : "—"
+                unit: station.telemetryStatus === "live" ? "m/s" : ""
+                }
         }
 
         RowLayout {
@@ -141,7 +186,12 @@ ApplicationWindow {
                     DrivePad { Layout.fillWidth: true }
                     Item { Layout.fillHeight: true }
                     Label {
-                        text: "Watchdog: " + (station.telemetryData.failsafe ? "holding stop" : "receiving commands")
+                        text: "Watchdog: " +
+                            (station.telemetryStatus !== "live"
+                                ? "unavailable"
+                                : (station.telemetryData.failsafe
+                                ? "holding stop"
+                                : "receiving commands"))
                         color: "#485b70"
                         font.pixelSize: 10
                         font.bold: true

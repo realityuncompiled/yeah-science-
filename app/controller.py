@@ -25,6 +25,7 @@ class Station(QObject):
         self.config = config
         self.link = UdpLink(config["station_port"], config["rover_port"])
         self.telemetry = TelemetryStore()
+        self._has_telemetry = False
         self._online = False
         self._armed = False
         self._left = self._right = 0.0
@@ -42,6 +43,7 @@ class Station(QObject):
 
     connected = Property(bool, lambda self: self._online, notify=changed)
     armed = Property(bool, lambda self: self._armed, notify=changed)
+    telemetryStatus = Property(str, lambda self: self._telemetry_status(), notify=changed)
     telemetryData = Property("QVariantMap", lambda self: self.telemetry.values, notify=changed)
     eventLines = Property("QStringList", lambda self: self._events, notify=eventsChanged)
     speed = Property(float, lambda self: self._speed, notify=changed)
@@ -64,6 +66,7 @@ class Station(QObject):
         try:
             self.link.open()
             self._online = True
+            self._has_telemetry = False
             self.link.send(encode("hello", self._seq))
             self._seq += 1
             self.note("Datalink opened on port " + str(self.config["station_port"]))
@@ -198,6 +201,18 @@ class Station(QObject):
         self._left = self._right = 0.0
         self._send_drive()
         self.changed.emit()
+    def _telemetry_status(self):
+        if not self._online:
+            return "disconnected"
+
+        if not self._has_telemetry:
+            return "waiting"
+
+        age = time.monotonic() - self.telemetry.received_at
+        if age * 1000 > self.config["stale_after_ms"]:
+            return "stale"
+
+        return "live"
 
     @Slot()
     def tick(self):
@@ -219,6 +234,7 @@ class Station(QObject):
                 if packet["type"] == "telemetry":
                     first = self.telemetry.received_at is None
                     self.telemetry.update(packet)
+                    self._has_telemetry = True
                     if first:
                         self.note("First rover telemetry received")
             if self._armed:
